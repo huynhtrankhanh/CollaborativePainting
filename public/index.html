@@ -27,6 +27,35 @@
         canvas.addEventListener('mouseup', stopDrawing);
         canvas.addEventListener('mouseout', stopDrawing);
 
+        // A queue to store drawing events before sending them
+        let drawingQueue = [];
+
+        // Create a ReadableStream to send data continuously
+        const stream = new ReadableStream({
+            start(controller) {
+                function sendNext() {
+                    if (drawingQueue.length > 0) {
+                        const data = drawingQueue.shift();  // Get the next drawing event
+                        const chunk = new TextEncoder().encode(JSON.stringify(data) + '\n');
+                        controller.enqueue(chunk);
+                    }
+                    setTimeout(sendNext, 50);  // Control the speed of sending events
+                }
+
+                sendNext();
+            }
+        });
+
+        // Start a long-lived fetch request
+        fetch('/paint-stream', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain',
+                'Connection': 'keep-alive'
+            },
+            body: stream
+        });
+
         function startDrawing(event) {
             drawing = true;
             draw(event); // Draw dot at the start point
@@ -44,19 +73,8 @@
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
 
-            // Send drawing data to the server
-            sendPaintEvent(x, y);
-        }
-
-        function sendPaintEvent(x, y) {
-            const data = { x, y };
-            fetch('/paint', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(data)
-            });
+            // Store drawing data in the queue to be sent via the stream
+            drawingQueue.push({ x, y });
         }
 
         // Listen for drawing events from the server
