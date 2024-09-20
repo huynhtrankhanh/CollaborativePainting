@@ -11,10 +11,24 @@ app.use(express.static(__dirname + '/public'));
 app.use(express.json());
 
 // Endpoint to receive paint events from clients
-app.post('/paint', (req, res) => {
-    const eventData = `data: ${JSON.stringify(req.body)}\n\n`;
-    clients.forEach(client => client.write(eventData));
-    res.status(200).end();
+app.post('/paint-stream', (req, res) => {
+    req.setEncoding('utf8');
+
+    req.on('data', (chunk) => {
+        try {
+            const events = chunk.trim().split('\n').map(line => JSON.parse(line));
+            events.forEach(event => {
+                const eventData = `data: ${JSON.stringify(event)}\n\n`;
+                clients.forEach(client => client.write(eventData));  // Broadcast to all connected clients
+            });
+        } catch (error) {
+            console.error('Error parsing event data:', error);
+        }
+    });
+
+    req.on('end', () => {
+        res.status(200).end();
+    });
 });
 
 // SSE endpoint for clients to subscribe to paint events
