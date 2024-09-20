@@ -53,7 +53,8 @@
                 'Content-Type': 'text/plain',
                 'Connection': 'keep-alive'
             },
-            body: stream
+            body: stream,
+            duplex: 'half'
         });
 
         function startDrawing(event) {
